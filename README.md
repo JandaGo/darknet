@@ -1,5 +1,5 @@
 # Yolo v4, v3 and v2 for Windows and Linux
-
+# 나는빡빡이다
 ## (neural networks for object detection)
 
 Paper YOLO v4: https://arxiv.org/abs/2004.10934
