@@ -1,5 +1,5 @@
 classes= 3
-train  = ./project/forklift/train.txt
-valid  = ./project/forklift/test.txt
-names = /home/aidenpark/darknet/0323project/coco.names
-backup = ./project/forklift/backup
+train  = ./0323project/train.txt
+valid  = ./0323project/test.txt
+names = ./0323project/coco.names
+backup = ./0323project/backup
