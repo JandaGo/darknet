@@ -1,0 +1,20 @@
+./darknet detector train project/forklift/coco.data project/forklift/yolov3.cfg project/forklift/darknet53.conv.74 -map
+
+
+
+./darknet detector map project/forklift/coco.data project/forklift/yolov3-tiny.cfg project/forklift/yolov3-tiny_best.weights 
+
+
+./darknet detector demo project/forklift/coco.data project/forklift/yolov3-tiny.cfg project/forklift/backup/yolov3-tiny_best.weights project/forklift/data_1.mp4 -out_filename project/forklift/res0614.avi -thresh 0.25
+
+
+
+./darknet detector train project/GLine/coco.data project/GLine/yolov3-tiny.cfg project/GLine/yolov3-tiny_best.weights -map
+
+
+
+./darknet detector map project/GLine/coco.data project/GLine/yolov3-tiny.cfg backup/yolov3-tiny_best.weights 
+
+
+./darknet detector demo project/GLine/coco.data project/GLine/yolov3-tiny.cfg backup/yolov3-tiny_best.weights project/GLine/testfile/data_1.mp4 -out_filename res0311.avi
+

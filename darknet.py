@@ -12,6 +12,8 @@ from ctypes import *
 import math
 import random
 import os
+import math
+
 
 
 class BOX(Structure):
@@ -24,7 +26,6 @@ class BOX(Structure):
 class DETECTION(Structure):
     _fields_ = [("bbox", BOX),
                 ("classes", c_int),
-                ("best_class_idx", c_int),
                 ("prob", POINTER(c_float)),
                 ("mask", POINTER(c_float)),
                 ("objectness", c_float),
@@ -71,7 +72,15 @@ def bbox2points(bbox):
     xmax = int(round(x + (w / 2)))
     ymin = int(round(y - (h / 2)))
     ymax = int(round(y + (h / 2)))
-    return xmin, ymin, xmax, ymax
+    return xmin, ymin, xmax, ymax, x, y, w, h
+
+def bbox4points(bbox):
+    """
+    From bounding box yolo format
+    to corner points cv2 rectangle
+    """
+    x, y, w, h = bbox
+    return x, y, w, h
 
 
 def class_colors(names):
@@ -107,83 +116,45 @@ def load_network(config_file, data_file, weights, batch_size=1):
 
 
 def print_detections(detections, coordinates=False):
-    print("\nObjects:")
+    #print("\nObjects:")
     for label, confidence, bbox in detections:
         x, y, w, h = bbox
         if coordinates:
-            print("{}: {}%    (left_x: {:.0f}   top_y:  {:.0f}   width:   {:.0f}   height:  {:.0f})".format(label, confidence, x, y, w, h))
+            print(" ")
         else:
-            print("{}: {}%".format(label, confidence))
+            print(" ")
+            #print("{}: {}%".format(label, confidence))
 
 
 def draw_boxes(detections, image, colors):
     import cv2
-    for label, confidence, bbox in detections:
-        left, top, right, bottom = bbox2points(bbox)
-        cv2.rectangle(image, (left, top), (right, bottom), colors[label], 1)
-        cv2.putText(image, "{} [{:.2f}]".format(label, float(confidence)),
-                    (left, top - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                    colors[label], 2)
-    return image
+    # cv2.putText(image, confidence, (50,20), cv2.FONT_HERSHEY_COMPLEX, 1, (255,0,0), 1)
 
+    for label, confidence, bbox in detections:
+        left, top, right, bottom, x, y, w, h = bbox2points(bbox)
+
+        if label != "a":
+            # cv2.rectangle(image, (left, top), (right, bottom), colors[label], 3)
+            cv2.circle(image, (x,y),  int(math.sqrt((int(w/2)*int(w/2))+(int(h/2)*int(h/2)))), (255, 0, 0))
+            cv2.putText(image, "{} [{:.2f}]".format(label, float(confidence)),
+                        (left, top - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                        colors[label], 2)
+
+
+
+    return image
+'''Forklift
+Person
+HandForklift'''
 
 def decode_detection(detections):
     decoded = []
     for label, confidence, bbox in detections:
+        conf = confidence
         confidence = str(round(confidence * 100, 2))
         decoded.append((str(label), confidence, bbox))
     return decoded
 
-# https://www.pyimagesearch.com/2015/02/16/faster-non-maximum-suppression-python/
-# Malisiewicz et al.
-def non_max_suppression_fast(detections, overlap_thresh):
-    boxes = []
-    for detection in detections:
-        _, _, _, (x, y, w, h) = detection
-        x1 = x - w / 2
-        y1 = y - h / 2
-        x2 = x + w / 2
-        y2 = y + h / 2
-        boxes.append(np.array([x1, y1, x2, y2]))
-    boxes_array = np.array(boxes)
-
-    # initialize the list of picked indexes
-    pick = []
-    # grab the coordinates of the bounding boxes
-    x1 = boxes_array[:, 0]
-    y1 = boxes_array[:, 1]
-    x2 = boxes_array[:, 2]
-    y2 = boxes_array[:, 3]
-    # compute the area of the bounding boxes and sort the bounding
-    # boxes by the bottom-right y-coordinate of the bounding box
-    area = (x2 - x1 + 1) * (y2 - y1 + 1)
-    idxs = np.argsort(y2)
-    # keep looping while some indexes still remain in the indexes
-    # list
-    while len(idxs) > 0:
-        # grab the last index in the indexes list and add the
-        # index value to the list of picked indexes
-        last = len(idxs) - 1
-        i = idxs[last]
-        pick.append(i)
-        # find the largest (x, y) coordinates for the start of
-        # the bounding box and the smallest (x, y) coordinates
-        # for the end of the bounding box
-        xx1 = np.maximum(x1[i], x1[idxs[:last]])
-        yy1 = np.maximum(y1[i], y1[idxs[:last]])
-        xx2 = np.minimum(x2[i], x2[idxs[:last]])
-        yy2 = np.minimum(y2[i], y2[idxs[:last]])
-        # compute the width and height of the bounding box
-        w = np.maximum(0, xx2 - xx1 + 1)
-        h = np.maximum(0, yy2 - yy1 + 1)
-        # compute the ratio of overlap
-        overlap = (w * h) / area[idxs[:last]]
-        # delete all indexes from the index list that have
-        idxs = np.delete(idxs, np.concatenate(([last],
-                                               np.where(overlap > overlap_thresh)[0])))
-        # return only the bounding boxes that were picked using the
-        # integer data type
-    return [detections[i] for i in pick]
 
 def remove_negatives(detections, class_names, num):
     """
@@ -193,27 +164,15 @@ def remove_negatives(detections, class_names, num):
     for j in range(num):
         for idx, name in enumerate(class_names):
             if detections[j].prob[idx] > 0:
+		
                 bbox = detections[j].bbox
                 bbox = (bbox.x, bbox.y, bbox.w, bbox.h)
                 predictions.append((name, detections[j].prob[idx], (bbox)))
     return predictions
 
 
-def remove_negatives_faster(detections, class_names, num):
-    """
-    Faster version of remove_negatives (very useful when using yolo9000)
-    """
-    predictions = []
-    for j in range(num):
-        if detections[j].best_class_idx == -1:
-            continue
-        name = class_names[detections[j].best_class_idx]
-        bbox = detections[j].bbox
-        bbox = (bbox.x, bbox.y, bbox.w, bbox.h)
-        predictions.append((name, detections[j].prob[detections[j].best_class_idx], bbox))
-    return predictions
 
-
+#detections part class_names = labels
 def detect_image(network, class_names, image, thresh=.5, hier_thresh=.5, nms=.45):
     """
         Returns a list with highest confidence class and their bbox
@@ -239,7 +198,7 @@ elif os.name == "nt":
     os.environ['PATH'] = cwd + ';' + os.environ['PATH']
     lib = CDLL("darknet.dll", RTLD_GLOBAL)
 else:
-    print("Unsupported OS")
+    #print("Unsupported OS")
     exit
 
 lib.network_width.argtypes = [c_void_p]
